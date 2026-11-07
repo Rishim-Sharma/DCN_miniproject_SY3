@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WANSim - WAN Network Design using Routers</title>
+<style>
+  :root{
+    --bg:#050b0a; --card:#0a1513; --line:#1b3a33; --txt:#d7efe8; --dim:#6f8f86;
+    --ok:#2de0a5; --bad:#ff5d6c; --warn:#e8b84a;
+    --hq:#5b6cff; --pune:#f06a9a; --del:#f2603f; --wan:#e6c44a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#020605;font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;color:var(--txt)}
+  #app{width:1280px;background:var(--bg);display:flex;flex-direction:column;border:1px solid #10231f}
+  #top{display:flex;justify-content:space-between;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line);background:#07110f}
+  #top h1{font-size:14px;margin:0;letter-spacing:.3px}
+  #top h1 span{color:var(--ok)}
+  #top .sub{font-size:11px;color:var(--dim)}
+  #main{display:flex}
+  #left{width:960px;border-right:1px solid var(--line)}
+  #canvas{display:block;background-image:radial-gradient(#10241f 1px,transparent 1px);background-size:22px 22px}
+  #rt{border-top:1px solid var(--line);padding:10px 16px 14px;background:#07110f}
+  #rt h3{margin:0 0 8px;font-size:12px;font-weight:600;display:flex;justify-content:space-between}
+  #rt h3 small{color:var(--dim);font-weight:400}
+  table{width:100%;border-collapse:collapse;font-size:11px;font-family:Consolas,"SF Mono",Menlo,monospace}
+  th{color:var(--dim);text-align:left;font-weight:500;padding:3px 6px;border-bottom:1px solid var(--line)}
+  td{padding:3px 6px;border-bottom:1px solid #0f211d}
+  .st-ok{color:var(--ok)} .st-bk{color:var(--warn)} .st-dn{color:var(--bad)} .st-c{color:#7fb6ff}
+  #panel{width:320px;padding:12px 14px;font-size:11px;display:flex;flex-direction:column;gap:12px;background:#07110f}
+  .sec h4{margin:0 0 6px;font-size:9.5px;letter-spacing:1.2px;color:var(--dim);font-weight:600}
+  .box{border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--card)}
+  .stat{display:flex;justify-content:space-between;padding:2px 0}
+  .stat b{color:var(--ok)}
+  .net{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;margin-bottom:5px;background:var(--card)}
+  .net i{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .net .n{font-weight:600;flex:1}
+  .net .c{font-family:Consolas,Menlo,monospace;color:var(--dim)}
+  .lnk{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border:1px solid var(--line);border-radius:6px;margin-bottom:5px;background:var(--card)}
+  .lnk .t{font-size:10.5px}
+  .lnk .t small{display:block;color:var(--dim);font-size:9.5px;font-family:Consolas,Menlo,monospace}
+  button{cursor:pointer;font:inherit;font-size:10.5px;border-radius:5px;border:1px solid var(--line);background:#0e1f1b;color:var(--txt);padding:4px 9px}
+  button.up{border-color:#1d6b55;color:var(--ok)} button.down{border-color:#7a2a33;color:var(--bad)}
+  select{width:100%;background:#0b1816;color:var(--txt);border:1px solid var(--line);border-radius:5px;padding:5px 6px;font:inherit;font-size:11px;margin-bottom:6px}
+  label{display:block;font-size:9.5px;color:var(--dim);margin:2px 0 3px}
+  #go{width:100%;background:var(--ok);color:#03150f;font-weight:700;border:none;padding:8px;font-size:12px;margin-top:2px}
+  #res{margin-top:8px;border-radius:6px;padding:8px 10px;border:1px solid var(--line);font-weight:700;font-size:12px}
+  #res.pass{border-color:#1d8a68;background:#0a2a22;color:var(--ok)}
+  #res.fail{border-color:#8a2a35;background:#2a0d12;color:var(--bad)}
+  #res.idle{color:var(--dim);font-weight:400}
+  #detail{margin-top:7px;color:var(--dim);line-height:1.5}
+  #detail .p{color:var(--txt);font-family:Consolas,Menlo,monospace;font-size:10px;word-break:break-word}
+  #detail .h{font-family:Consolas,Menlo,monospace;font-size:9.5px;color:#8fb3a9}
+  .node text{pointer-events:none}
+  .node{cursor:pointer}
+  .lbtn{cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <h1><span>WANSim</span> &nbsp;|&nbsp; WAN Network Design using Routers</h1>
+    <div class="sub">3 sites &middot; serial point-to-point links &middot; static routing with floating backup routes</div>
+  </div>
+  <div id="main">
+    <div id="left">
+      <svg id="canvas" width="960" height="470" viewBox="0 0 960 470"></svg>
+      <div id="rt"></div>
+    </div>
+    <div id="panel">
+      <div class="sec"><h4>TOPOLOGY OVERVIEW</h4><div class="box" id="ov"></div></div>
+      <div class="sec"><h4>NETWORKS</h4><div id="nets"></div></div>
+      <div class="sec"><h4>WAN LINKS (click to fail / restore)</h4><div id="lnks"></div></div>
+      <div class="sec">
+        <h4>TRAFFIC PATH TEST</h4>
+        <label>Source (from)</label><select id="src"></select>
+        <label>Destination (to)</label><select id="dst"></select>
+        <button id="go">Test traffic (ping)</button>
+        <div id="res" class="idle">Pick a source and destination, then press Test traffic.</div>
+        <div id="detail"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- helpers ---------- */
+const ip2i = ip => ip.split('.').reduce((a,o)=>((a<<8)|+o)>>>0,0);
+const mask = l => l===0?0:((0xFFFFFFFF<<(32-l))>>>0);
+const inNet = (ip,net,l) => ((ip2i(ip)&mask(l))>>>0)===((ip2i(net)&mask(l))>>>0);
+const COL = {hq:'#5b6cff',pune:'#f06a9a',del:'#f2603f',wan:'#e6c44a'};
+
+/* ---------- topology data ---------- */
+const SITES = {
+  hq:  {name:'HQ Mumbai',   net:'192.168.10.0', col:COL.hq,   x:480, r:'R1', sw:'SW1', pre:'HQ'},
+  pune:{name:'Branch Pune', net:'192.168.20.0', col:COL.pune, x:170, r:'R2', sw:'SW2', pre:'PUNE'},
+  del: {name:'Branch Delhi',net:'192.168.30.0', col:COL.del,  x:790, r:'R3', sw:'SW3', pre:'DEL'}
+};
+const RY=120, SY=262, HY=392;
+const nodes = {};
+const links = [];
+const routers = {};
+const hosts = {};
+
+Object.entries(SITES).forEach(([k,s])=>{
+  nodes[s.r] = {id:s.r,type:'router',label:{R1:'HQ-R1',R2:'BR-R2',R3:'BR-R3'}[s.r],sub:'Router · '+s.name,x:s.x,y:RY,col:s.col,site:k};
+  nodes[s.sw]= {id:s.sw,type:'switch',label:'SW-'+s.pre,sub:'L2 switch · LAN',x:s.x,y:SY,col:s.col,site:k};
+  const base = s.net.replace(/\.0$/,'');
+  [['PC1',10,'pc',-102],['PC2',11,'pc',0],['SRV',100,'srv',102]].forEach(([n,o,t,dx])=>{
+    const id = s.pre+'-'+n;
+    nodes[id] = {id,type:'host',kind:t,label:id,sub:base+'.'+o,x:s.x+dx,y:HY,col:s.col,site:k};
+    hosts[id] = {id,ip:base+'.'+o,gw:base+'.1',sw:s.sw,site:k};
+    links.push({id:'h-'+id,a:id,b:s.sw,kind:'lan',up:true,delay:0.2});
+  });
+  links.push({id:'lan-'+s.r,a:s.r,b:s.sw,kind:'lan',up:true,delay:0.3});
+  routers[s.r] = {id:s.r,name:nodes[s.r].label,site:k,ifaces:[{n:'Gi0/0',ip:base+'.1',len:24,link:'lan-'+s.r,lan:true,sw:s.sw}],routes:[]};
+});
+[
+ {id:'w12',a:'R1',b:'R2',net:'10.0.12.0/30',ipA:'10.0.12.1',ipB:'10.0.12.2',ifA:'S0/0/0',ifB:'S0/0/0',delay:18},
+ {id:'w13',a:'R1',b:'R3',net:'10.0.13.0/30',ipA:'10.0.13.1',ipB:'10.0.13.2',ifA:'S0/0/1',ifB:'S0/0/0',delay:32},
+ {id:'w23',a:'R2',b:'R3',net:'10.0.23.0/30',ipA:'10.0.23.1',ipB:'10.0.23.2',ifA:'S0/0/1',ifB:'S0/0/1',delay:26}
+].forEach(w=>{
+  links.push({id:w.id,a:w.a,b:w.b,kind:'wan',up:true,delay:w.delay,net:w.net,ipA:w.ipA,ipB:w.ipB});
+  routers[w.a].ifaces.push({n:w.ifA,ip:w.ipA,len:30,link:w.id});
+  routers[w.b].ifaces.push({n:w.ifB,ip:w.ipB,len:30,link:w.id});
+});
+/* static routes: AD 1 primary (direct link), AD 200 floating backup (via third router) */
+const S=(net,via,ad)=>({net,len:24,via,ad});
+routers.R1.routes=[S('192.168.20.0','10.0.12.2',1),S('192.168.30.0','10.0.13.2',1),S('192.168.20.0','10.0.13.2',200),S('192.168.30.0','10.0.12.2',200)];
+routers.R2.routes=[S('192.168.10.0','10.0.12.1',1),S('192.168.30.0','10.0.23.2',1),S('192.168.10.0','10.0.23.2',200),S('192.168.30.0','10.0.12.1',200)];
+routers.R3.routes=[S('192.168.10.0','10.0.13.1',1),S('192.168.20.0','10.0.23.1',1),S('192.168.10.0','10.0.23.1',200),S('192.168.20.0','10.0.13.1',200)];
+
+const linkById = Object.fromEntries(links.map(l=>[l.id,l]));
+const lkey = (a,b)=>[a,b].sort().join('|');
+const linkByPair = Object.fromEntries(links.map(l=>[lkey(l.a,l.b),l]));
+const routerByIp = ip => Object.values(routers).find(r=>r.ifaces.some(i=>i.ip===ip));
+const ifaceUp = i => linkById[i.link].up;
+
+/* ---------- routing / forwarding engine ---------- */
+function egressIface(r,via){ return r.ifaces.find(i=>!i.lan && inNet(via,i.ip,i.len)); }
+function bestRoute(r,dstIp){
+  let best=null;
+  r.routes.forEach(rt=>{
+    if(!inNet(dstIp,rt.net,rt.len)) return;
+    const e=egressIface(r,rt.via); if(!e||!ifaceUp(e)) return;
+    if(!best || rt.len>best.len || (rt.len===best.len && rt.ad<best.ad)) best={...rt,iface:e};
+  });
+  return best;
+}
+function trace(srcId,dstId){
+  const s=hosts[srcId], d=hosts[dstId];
+  const out={ok:false,nodes:[srcId],routers:0,delay:0.4,hops:[],fail:null,backup:false};
+  if(s.sw===d.sw && s.site===d.site){ out.nodes.push(s.sw,dstId); out.ok=true; return out; }
+  let cur=routerByIp(s.gw); out.nodes.push(s.sw,cur.id); out.routers=1;
+  for(let n=0;n<8;n++){
+    const conn=cur.ifaces.find(i=>inNet(d.ip,i.ip,i.len));
+    if(conn){ if(conn.lan){ out.nodes.push(conn.sw,dstId); out.ok=true; out.hops.push(cur.name+': '+d.ip+' is directly connected ('+conn.n+')'); return out; }
+              out.fail=cur.name+': destination unreachable'; return out; }
+    const rt=bestRoute(cur,d.ip);
+    if(!rt){ out.fail='Destination net unreachable from '+cur.name+' (no active route to '+d.ip.replace(/\.\d+$/,'.0/24')+')'; return out; }
+    if(rt.ad>1) out.backup=true;
+    const nxt=routerByIp(rt.via); const lk=linkById[rt.iface.link];
+    out.hops.push(cur.name+': '+rt.net+'/'+rt.len+' via '+rt.via+' ('+rt.iface.n+') ['+rt.ad+'/0]'+(rt.ad>1?' backup':''));
+    out.nodes.push(nxt.id); out.delay+=lk.delay; out.routers++; cur=nxt;
+  }
+  out.fail='Routing loop / TTL expired'; return out;
+}
+function ping(srcId,dstId){
+  const f=trace(srcId,dstId);
+  if(!f.ok) return {ok:false,fwd:f,why:f.fail};
+  const b=trace(dstId,srcId);
+  if(!b.ok) return {ok:false,fwd:f,why:'Reply lost: '+b.fail};
+  const base=Math.round((f.delay+b.delay)*10)/10;
+  const rtts=[1.4,0.6,1.0,0.5].map(j=>Math.round(base+j));
+  return {ok:true,fwd:f,back:b,ttl:128-b.routers+ (b.routers?0:0),rtts,backup:f.backup||b.backup};
+}
+
+/* ---------- rendering ---------- */
+let state={sel:'R1',test:null};
+const svg=document.getElementById('canvas');
+const NS='http://www.w3.org/2000/svg';
+
+function icon(type,kind,x,y,c){
+  const st='fill="none" stroke="'+c+'" stroke-width="1.4" stroke-linecap="round"';
+  if(type==='router') return `<g transform="translate(${x},${y})"><circle r="8" ${st}/><path d="M-4 0H4M0 -4V4" ${st}/></g>`;
+  if(type==='switch') return `<g transform="translate(${x},${y})"><path d="M-8 -3H6M3 -6L7 -3L3 0M8 4H-6M-3 1L-7 4L-3 7" ${st}/></g>`;
+  if(kind==='srv')    return `<g transform="translate(${x},${y})"><rect x="-7" y="-8" width="14" height="6" rx="1" ${st}/><rect x="-7" y="0" width="14" height="6" rx="1" ${st}/><circle cx="-4" cy="-5" r=".8" fill="${c}"/><circle cx="-4" cy="3" r=".8" fill="${c}"/></g>`;
+  return `<g transform="translate(${x},${y})"><rect x="-8" y="-7" width="16" height="10" rx="1.5" ${st}/><path d="M-4 7H4M0 3V7" ${st}/></g>`;
+}
+function dims(n){ return n.type==='router'?[132,50]:n.type==='switch'?[112,42]:[98,44]; }
+
+function render(){
+  const act = state.test; // {ok, nodes[]}
+  const actNodes = new Set(act?act.nodes:[]);
+  const actLinks = new Set(); if(act) act.nodes.forEach((n,i)=>{ if(i) actLinks.add(lkey(act.nodes[i-1],n)); });
+  const hc = act? (act.ok? '#2de0a5':'#ff5d6c') : null;
+  let h='';
+  // links
+  links.forEach(l=>{
+    const A=nodes[l.a],B=nodes[l.b]; const on=actLinks.has(lkey(l.a,l.b));
+    let stroke = l.kind==='wan'?'#4a4426':'#1f4a41', w=l.kind==='wan'?2.2:1;
+    if(l.kind==='wan' && l.up) stroke='#8c7b2c';
+    if(!l.up) stroke='#7a2a33';
+    if(on){ stroke=hc; w=2.6; }
+    const dash = !l.up?'stroke-dasharray="6 5"':'';
+    let d;
+    if(l.id==='w23') d=`M${A.x} ${A.y} Q 480 -30 ${B.x} ${B.y}`; else d=`M${A.x} ${A.y} L${B.x} ${B.y}`;
+    h+=`<path id="p-${l.id}" d="${d}" fill="none" stroke="${stroke}" stroke-width="${w}" ${dash}/>`;
+  });
+  // WAN labels
+  const wl = {
+    w12:{x:325,y:104,l:'10.0.12.0/30 · 18 ms',a:[246,140,'.2','start'],b:[414,140,'.1','end']},
+    w13:{x:635,y:104,l:'10.0.13.0/30 · 32 ms',a:[552,140,'.1','start'],b:[718,140,'.2','end']},
+    w23:{x:480,y:30,l:'10.0.23.0/30 · 26 ms',a:[196,86,'.1','start'],b:[764,86,'.2','end']}
+  };
+  Object.entries(wl).forEach(([id,o])=>{
+    const l=linkById[id];
+    h+=`<text x="${o.x}" y="${o.y}" text-anchor="middle" font-size="10" fill="${l.up?'#c9b04a':'#ff5d6c'}" font-family="Consolas,Menlo,monospace">${o.l}</text>`;
+    h+=`<text x="${o.a[0]}" y="${o.a[1]}" font-size="9" fill="#7c8f88" text-anchor="${o.a[3]}" font-family="Consolas,monospace">${o.a[2]}</text>`;
+    h+=`<text x="${o.b[0]}" y="${o.b[1]}" font-size="9" fill="#7c8f88" text-anchor="${o.b[3]}" font-family="Consolas,monospace">${o.b[2]}</text>`;
+    // clickable badge
+    const bx=o.x, by=id==='w23'?o.y+36:o.y+16;
+    h+=`<g class="lbtn" data-link="${id}"><rect x="${bx-26}" y="${by-8}" width="52" height="16" rx="8" fill="${l.up?'#0d2a22':'#2a0d12'}" stroke="${l.up?'#1d6b55':'#8a2a35'}"/><text x="${bx}" y="${by+3.5}" font-size="9" text-anchor="middle" fill="${l.up?'#2de0a5':'#ff5d6c'}">${l.up?'LINK UP':'DOWN'}</text></g>`;
+  });
+  // site labels
+  Object.values(SITES).forEach(s=>{
+    h+=`<text x="${s.x}" y="448" text-anchor="middle" font-size="10.5" fill="${s.col}" font-weight="600">${s.name} · ${s.net}/24</text>`;
+  });
+  // nodes
+  Object.values(nodes).forEach(n=>{
+    const [w,hh]=dims(n); const on=actNodes.has(n.id);
+    const isSel = n.type==='router' && state.sel===n.id;
+    const stroke = on?hc:(isSel?'#8ff0cf':'#1e3f37');
+    const fill = on?(act.ok?'#0b2a22':'#2a0d12'):'#0a1513';
+    h+=`<g class="node" data-node="${n.id}">`;
+    h+=`<rect x="${n.x-w/2}" y="${n.y-hh/2}" width="${w}" height="${hh}" rx="7" fill="${fill}" stroke="${stroke}" stroke-width="${on||isSel?2:1}"/>`;
+    h+=`<rect x="${n.x-w/2+8}" y="${n.y-hh/2}" width="${w-16}" height="2.5" rx="1" fill="${n.col}"/>`;
+    h+=icon(n.type,n.kind,n.x-w/2+18,n.y+1,n.col);
+    h+=`<text x="${n.x-w/2+32}" y="${n.y-2}" font-size="11" font-weight="700" fill="#e4f6f0">${n.label}</text>`;
+    h+=`<text x="${n.x-w/2+32}" y="${n.y+11}" font-size="8.5" fill="#6f8f86">${n.sub}</text>`;
+    h+=`</g>`;
+  });
+  h+=`<circle id="pkt" r="5" fill="#fff" opacity="0"><animate attributeName="opacity" values="0;0" dur="1s" repeatCount="1"/></circle>`;
+  svg.innerHTML=h;
+  svg.querySelectorAll('.lbtn').forEach(e=>e.onclick=()=>toggleLink(e.dataset.link));
+  svg.querySelectorAll('.node').forEach(e=>e.onclick=()=>{ const n=nodes[e.dataset.node]; if(n.type==='router'){state.sel=n.id;render();renderRT();} });
+  animate();
+}
+
+let animId=0;
+function animate(){
+  cancelAnimationFrame(animId);
+  const t=state.test; if(!t||!t.ok) return;
+  const pts=t.nodes.map(i=>[nodes[i].x,nodes[i].y]); const c=svg.querySelector('#pkt'); if(!c) return;
+  const seg=pts.length-1; const t0=performance.now();
+  (function f(now){
+    const p=((now-t0)/2600)%1.15; if(p>1){ c.setAttribute('opacity',0); }
+    else{ const q=p*seg, i=Math.min(Math.floor(q),seg-1), u=q-i;
+      c.setAttribute('cx',pts[i][0]+(pts[i+1][0]-pts[i][0])*u); c.setAttribute('cy',pts[i][1]+(pts[i+1][1]-pts[i][1])*u); c.setAttribute('opacity',1);}
+    animId=requestAnimationFrame(f);
+  })(t0);
+}
+
+function renderRT(){
+  const r=routers[state.sel]; let rows='';
+  r.ifaces.forEach(i=>{
+    const up=ifaceUp(i); const net=i.ip.replace(/\.\d+$/,'.0');
+    rows+=`<tr><td class="st-c">C</td><td>${net}/${i.len}</td><td>directly connected</td><td>${i.n}</td><td>0/0</td><td class="${up?'st-ok':'st-dn'}">${up?'installed':'interface down'}</td></tr>`;
+  });
+  const installed=new Set();
+  r.routes.forEach(rt=>{ const b=bestRoute(r,rt.net); if(b&&b.via===rt.via&&b.ad===rt.ad&&b.net===rt.net) installed.add(rt); });
+  const sorted=[...r.routes].sort((a,b)=>a.net.localeCompare(b.net)||a.ad-b.ad);
+  sorted.forEach(rt=>{
+    const e=egressIface(r,rt.via); const up=ifaceUp(e); const ins=installed.has(rt);
+    let st,cls; if(ins){st='installed';cls='st-ok';} else if(!up){st='next-hop link down';cls='st-dn';} else {st='backup (floating)';cls='st-bk';}
+    rows+=`<tr><td>S</td><td>${rt.net}/${rt.len}</td><td>via ${rt.via}</td><td>${e.n}</td><td>${rt.ad}/0</td><td class="${cls}">${st}</td></tr>`;
+  });
+  document.getElementById('rt').innerHTML=`<h3><span>Routing table — ${r.name} (${SITES[r.site].name})</span><small>click a router in the diagram to switch &nbsp;|&nbsp; AD 1 = primary, AD 200 = floating backup</small></h3>
+  <table><tr><th>Code</th><th>Destination</th><th>Next hop</th><th>Interface</th><th>AD/Metric</th><th>Status</th></tr>${rows}</table>`;
+}
+
+function renderPanel(){
+  document.getElementById('ov').innerHTML=
+   `<div class="stat"><span>Routers</span><b>3</b></div><div class="stat"><span>Switches</span><b>3</b></div>
+    <div class="stat"><span>End hosts</span><b>9</b></div><div class="stat"><span>LANs / WAN links</span><b>3 / 3</b></div>
+    <div class="stat"><span>Routing</span><b>Static + floating</b></div>`;
+  document.getElementById('nets').innerHTML=
+   Object.values(SITES).map(s=>`<div class="net"><i style="background:${s.col}"></i><span class="n">${s.name}</span><span class="c">${s.net}/24</span></div>`).join('')+
+   `<div class="net"><i style="background:${COL.wan}"></i><span class="n">WAN serial links</span><span class="c">10.0.x.0/30</span></div>`;
+  document.getElementById('lnks').innerHTML=links.filter(l=>l.kind==='wan').map(l=>
+   `<div class="lnk"><span class="t">${nodes[l.a].label} ⇄ ${nodes[l.b].label}<small>${l.net} · ${l.delay} ms</small></span><button class="${l.up?'up':'down'}" data-t="${l.id}">${l.up?'UP':'DOWN'}</button></div>`).join('');
+  document.querySelectorAll('#lnks button').forEach(b=>b.onclick=()=>toggleLink(b.dataset.t));
+}
+function toggleLink(id){ linkById[id].up=!linkById[id].up; state.test=null; resetResult(); renderPanel(); render(); renderRT(); }
+function resetResult(){ const r=document.getElementById('res'); r.className='idle'; r.textContent='Pick a source and destination, then press Test traffic.'; document.getElementById('detail').innerHTML=''; }
+
+function runTest(){
+  const s=document.getElementById('src').value, d=document.getElementById('dst').value;
+  const res=document.getElementById('res'), det=document.getElementById('detail');
+  if(s===d){ state.test=null; render(); res.className='fail'; res.textContent='Source and destination are the same host.'; det.innerHTML=''; return; }
+  const p=ping(s,d);
+  state.test={ok:p.ok,nodes:p.fwd.nodes};
+  if(p.ok){
+    res.className='pass'; res.innerHTML='✓ PASSES';
+    const lo=Math.min(...p.rtts), hi=Math.max(...p.rtts);
+    det.innerHTML=`<div>${p.backup?'The traffic gets through — rerouted over the <b style="color:#e8b84a">backup route</b> (WAN link failure).':'The traffic gets through — the connection from source to destination works.'}</div>
+     <div style="margin-top:6px">PATH</div><div class="p">${p.fwd.nodes.map(n=>nodes[n].label).join(' → ')}</div>
+     <div style="margin-top:6px">ROUTER LOOKUPS</div>${p.fwd.hops.map(x=>`<div class="h">${x}</div>`).join('')}
+     <div style="margin-top:6px">Reply from ${hosts[d].ip}: Replies 4/4 · TTL ${p.ttl} · ${lo}–${hi} ms · 0% loss</div>`;
+  } else {
+    res.className='fail'; res.innerHTML='✗ FAILS';
+    det.innerHTML=`<div>${p.why}</div><div style="margin-top:6px">PATH (until failure)</div><div class="p">${p.fwd.nodes.map(n=>nodes[n].label).join(' → ')}</div><div style="margin-top:6px">Replies 0/4 · 100% loss</div>`;
+  }
+  render();
+}
+
+/* init */
+const opts=Object.keys(hosts).map(h=>`<option value="${h}">${h} (${hosts[h].ip})</option>`).join('');
+document.getElementById('src').innerHTML=opts; document.getElementById('dst').innerHTML=opts;
+document.getElementById('dst').value='PUNE-PC1';
+document.getElementById('go').onclick=runTest;
+renderPanel(); render(); renderRT();
+</script>
+</body>
+</html>
